@@ -28,7 +28,15 @@ config: dict = {
 }
 
 
-def get_config(args, current_config: dict) -> None or dict:
+def get_config(args: argparse.Namespace, current_config: dict) -> dict:
+    """
+    Takes CLI args. If --config option provided there, tries to read config file, parse parameters from it,
+    and alters the default `current_config` dict. Raises exceptions if file contains unreadable parameters or not
+    exists.
+    :param args: CLI args dict
+    :param current_config: current config dict
+    :return: updated config dict
+    """
     current_config = current_config.copy()  # avoiding updating global config
     current_config['SCRIPT_LOG'] = current_config.get('SCRIPT_LOG', None)
     current_config['SCRIPT_LOG_LEVEL'] = current_config.get('SCRIPT_LOG_LEVEL', 'INFO')
@@ -44,7 +52,6 @@ def get_config(args, current_config: dict) -> None or dict:
             else:
                 print(f'Unable to read from {args.config}. Exiting...')
                 raise Exception
-
             # convert from str if provided in config file
             current_config['REPORT_SIZE'] = int(current_config['REPORT_SIZE'])
             current_config['ACCEPTABLE_PARSED_SHARE'] = float(current_config['ACCEPTABLE_PARSED_SHARE'])
@@ -61,11 +68,10 @@ def get_config(args, current_config: dict) -> None or dict:
 def get_latest_log(path: str, pattern: str) -> Union[namedtuple, None]:
     """
     Get plain text or .gz log file with the latest date in it's name,
-    in the `path` dir.
+    in the `path` dir. If nothing found returns None
     :param path: relative path to the target dir
     :param pattern: target regexp pattern. Must include `date` named group to discover yyyymmdd date format
-    :return: named tuple with str `filename` (name of the file found) and extracted `date` as datetime.date.
-    If nothing found `filename` is empty
+    :return: named tuple with str `file_path` (name of the file found) and extracted `date` as datetime.date.
     """
     file_name_pattern = re.compile(pattern, re.IGNORECASE)
     files = os.listdir(path)
@@ -112,6 +118,13 @@ def get_url_time_from_record(file_name: str, pattern: str):
 
 
 def get_validated_path(path_chunks: list, path_descr: str = None) -> str:
+    """
+    Join path chuncks into normalized path, checks path (directory or file) existence and returns path str.
+    If not exists raises IOError exception
+    :param path_chunks: list of path components. Some components might include slashes
+    :param path_descr: str to write to log if path not exists
+    :return path str with valid normalized path
+    """
     path = os.path.join(*path_chunks)
     path = os.path.normpath(path)  # avoiding mix slashes
     if not os.path.exists(path):
