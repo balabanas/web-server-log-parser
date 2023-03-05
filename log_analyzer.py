@@ -1,23 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
-
-# log_format ui_short '$remote_addr  $remote_user $http_x_real_ip [$time_local] "$request" '
-#                     '$status $body_bytes_sent "$http_referer" '
-#                     '"$http_user_agent" "$http_x_forwarded_for" "$http_X_REQUEST_ID" "$http_X_RB_USER" '
-#                     '$request_time';
 import argparse
 import configparser
 import gzip
 import logging
 import os
 import re
+import string
 import sys
 from collections import namedtuple, defaultdict, OrderedDict
 from datetime import datetime
 from statistics import mean, median
 from string import Template
-from typing import Union
+from typing import Union, Generator
 
 config: dict = {
     "REPORT_SIZE": 1000,
@@ -37,7 +32,7 @@ def get_config(args: argparse.Namespace, current_config: dict) -> dict:
     :param current_config: current config dict
     :return: updated config dict
     """
-    current_config = current_config.copy()  # avoiding updating global config
+    current_config: dict = current_config.copy()  # avoiding updating global config
     current_config['SCRIPT_LOG'] = current_config.get('SCRIPT_LOG', None)
     current_config['SCRIPT_LOG_LEVEL'] = current_config.get('SCRIPT_LOG_LEVEL', 'INFO')
     if args.config:  # -- config argument is provided in CLI
@@ -73,14 +68,14 @@ def get_latest_log(path: str, pattern: str) -> Union[namedtuple, None]:
     :param pattern: target regexp pattern. Must include `date` named group to discover yyyymmdd date format
     :return: named tuple with str `file_path` (name of the file found) and extracted `date` as datetime.date.
     """
-    file_name_pattern = re.compile(pattern, re.IGNORECASE)
-    files = os.listdir(path)
-    latest_file = ''
-    latest_date = datetime(1970, 1, 1).date()
+    file_name_pattern: re.Pattern = re.compile(pattern, re.IGNORECASE)
+    files: list = os.listdir(path)
+    latest_file: str = ''
+    latest_date: datetime.date = datetime(1970, 1, 1).date()
     for file in files:
-        match = file_name_pattern.search(file)
+        match: Union[re.Match, None] = file_name_pattern.search(file)
         if match:
-            date = match.group('date')
+            date: Union[str, datetime.date] = match.group('date')
             date = datetime.strptime(date, '%Y%m%d').date()
             if date > latest_date:
                 latest_file = file
@@ -89,7 +84,7 @@ def get_latest_log(path: str, pattern: str) -> Union[namedtuple, None]:
     return LogFile(file_path=os.path.join(path, latest_file), date=latest_date) if latest_file else None
 
 
-def get_url_time_from_record(file_name: str, pattern: str):
+def get_url_time_from_record(file_name: str, pattern: str) -> Generator[tuple, None, None]:
     """
     Generates next parsed line from `file_name` (log file), yielding requested url and request processing time.
     If pattern didn't match, url = '-', time = 0.0.
@@ -98,9 +93,9 @@ def get_url_time_from_record(file_name: str, pattern: str):
     :return: url:str, time:float
     """
     file_opener = gzip.open if file_name.endswith('.gz') else open
-    url_pattern = re.compile(pattern, re.IGNORECASE)
+    url_pattern: re.Pattern = re.compile(pattern, re.IGNORECASE)
     with file_opener(file_name, 'rt') as f:
-        record_count = sum(1 for _ in f)
+        record_count: int = sum(1 for _ in f)
         f.seek(0)
         record_processed: int = 0
         for i, line in enumerate(f):
@@ -108,11 +103,11 @@ def get_url_time_from_record(file_name: str, pattern: str):
             time: float = 0.0
             match = url_pattern.search(line)
             if match:
-                url = match.group('url')
-                time = float(match.group('time'))
+                url: str = match.group('url')
+                time: float = float(match.group('time'))
                 record_processed += 1
             if i % 100000 == 0:
-                progress = (i + 1) / record_count * 100
+                progress: float = (i + 1) / record_count * 100
                 print(f'Progress: {progress:.0f}%', end='\r')
             yield url, time
 
@@ -125,7 +120,7 @@ def get_validated_path(path_chunks: list, path_descr: str = None) -> str:
     :param path_descr: str to write to log if path not exists
     :return path str with valid normalized path
     """
-    path = os.path.join(*path_chunks)
+    path: str = os.path.join(*path_chunks)
     path = os.path.normpath(path)  # avoiding mix slashes
     if not os.path.exists(path):
         logging.error(f'The path {path} is not found ({path_descr}). Exiting...')
@@ -135,15 +130,15 @@ def get_validated_path(path_chunks: list, path_descr: str = None) -> str:
 
 def main():
     # Check if --config provided, updating config
-    parser = argparse.ArgumentParser()
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
     parser.add_argument('--config', default='', const='./config.ini', nargs='?', help='Path to a config file')
-    args = parser.parse_args()
-    conf = get_config(args, config)
+    args: argparse.Namespace = parser.parse_args()
+    working_config: dict = get_config(args, config)
 
     # Setting up logging
-    log_format = '%(asctime)s %(levelname).1s %(message)s'
-    logging.basicConfig(format=log_format, filename=conf['SCRIPT_LOG'],
-                        level=getattr(logging, conf['SCRIPT_LOG_LEVEL'], 'INFO'),
+    log_format: str = '%(asctime)s %(levelname).1s %(message)s'
+    logging.basicConfig(format=log_format, filename=working_config['SCRIPT_LOG'],
+                        level=getattr(logging, working_config['SCRIPT_LOG_LEVEL'], 'INFO'),
                         datefmt='%Y.%m.%d %H:%M:%S')
 
     def handle_exception(exc_type, exc_value, exc_traceback):
@@ -155,15 +150,15 @@ def main():
 
     logging.info('Log analyzer started')
     logging.debug(f'Default configuration: {config}')
-    logging.debug(f'Current configuration: {conf}')
+    logging.debug(f'Current configuration: {working_config}')
 
     logging.debug('Checking paths and files to work with')
-    report_template_file = get_validated_path(['./templates', 'report.html'], "Report template")
-    log_dir = get_validated_path([conf['LOG_DIR'], ], 'Log directory')
-    report_dir = get_validated_path([conf['REPORT_DIR'], ], 'Report directory')
+    report_template_file: str = get_validated_path(['./templates', 'report.html'], "Report template")
+    log_dir: str = get_validated_path([working_config['LOG_DIR'], ], 'Log directory')
+    report_dir: str = get_validated_path([working_config['REPORT_DIR'], ], 'Report directory')
 
     logging.debug('Finding the latest log to parse')
-    log_file_pattern = r"^nginx-access-ui\.log-(?P<date>\d{8})($|\.gz$)"
+    log_file_pattern: str = r"^nginx-access-ui\.log-(?P<date>\d{8})($|\.gz$)"
     log_file: namedtuple = get_latest_log(log_dir, log_file_pattern)
     if not log_file:
         logging.info('Log file is not found! Nothing to do. Exiting...')
@@ -171,15 +166,15 @@ def main():
     logging.info(f'Found log file to process: {log_file.file_path}')
 
     logging.debug('Setting up future report file. If already exists - exit')
-    report_file = os.path.join(report_dir, f"report-{log_file.date.strftime('%Y.%m.%d')}.html")
+    report_file: str = os.path.join(report_dir, f"report-{log_file.date.strftime('%Y.%m.%d')}.html")
     if os.path.exists(report_file):
         logging.info(f'The report for the latest date already exists: {report_file}. Exiting...')
         sys.exit(0)
 
     logging.debug('Set up pattern to parse log records')
     # Note `url` and `time` named groups
-    url_pattern = r'"GET (?P<url>.+?(?=\ http\/1.1")) http\/1.1"\s+.*?(?P<time>\d+\.\d{3})$'
-    url_times = defaultdict(list)
+    url_pattern: str = r'"GET (?P<url>.+?(?=\ http\/1.1")) http\/1.1"\s+.*?(?P<time>\d+\.\d{3})$'
+    url_times: defaultdict = defaultdict(list)
 
     logging.debug('Go parsing')
     for url, time in get_url_time_from_record(log_file.file_path, url_pattern):
@@ -187,26 +182,28 @@ def main():
     logging.debug('Finished parsing')
 
     logging.debug('Finding the proportion of the successfully parsed records. Exit if proportion is too small')
-    records_processed = sum(map(len, url_times.values()))
+    records_processed: int = sum(map(len, url_times.values()))
     if '-' in url_times:
         del url_times['-']
-    records_parsed = sum(map(len, url_times.values()))
-    records_parsed_share = round(records_parsed / records_processed, 3)
-    logging.debug(f"The share of records parsed: {records_parsed_share}, threshold: {conf['ACCEPTABLE_PARSED_SHARE']}")
-    if records_parsed_share < conf['ACCEPTABLE_PARSED_SHARE']:
+    records_parsed: int = sum(map(len, url_times.values()))
+    records_parsed_share: float = round(records_parsed / records_processed, 3)
+    logging.debug(f"The share of records parsed: {records_parsed_share}, "
+                  f"threshold: {working_config['ACCEPTABLE_PARSED_SHARE']}")
+    if records_parsed_share < working_config['ACCEPTABLE_PARSED_SHARE']:
         logging.error(
-            f"Less then {conf['ACCEPTABLE_PARSED_SHARE']} of log records where successfully parsed. "
+            f"Less then {working_config['ACCEPTABLE_PARSED_SHARE']} of log records where successfully parsed. "
             f"({records_parsed_share}). Check if log format corresponds script expectations. Exiting...")
         sys.exit(0)
 
-    logging.debug(f"Crop top {conf['REPORT_SIZE']} of urls with slowest total time")
+    logging.debug(f"Crop top {working_config['REPORT_SIZE']} of urls with slowest total time")
     # Use OrderedDict, so to preserve initial records' sort order in the report
-    top_url_times = OrderedDict(sorted(url_times.items(), key=lambda x: -sum(x[1]))[:conf['REPORT_SIZE']])
+    top_url_times: OrderedDict = OrderedDict(sorted(url_times.items(),
+                                                    key=lambda x: -sum(x[1]))[:working_config['REPORT_SIZE']])
 
-    times_sum = sum(map(sum, top_url_times.values()))
-    logging.debug(f"Total processing time of `slowest` {conf['REPORT_SIZE']} urls: {times_sum}")
-    times_count = sum(map(len, top_url_times.values()))
-    logging.debug(f"Total N of requests for `slowest` {conf['REPORT_SIZE']} urls: {times_count}")
+    times_sum: float = sum(map(sum, top_url_times.values()))
+    logging.debug(f"Total processing time of `slowest` {working_config['REPORT_SIZE']} urls: {times_sum}")
+    times_count: int = sum(map(len, top_url_times.values()))
+    logging.debug(f"Total N of requests for `slowest` {working_config['REPORT_SIZE']} urls: {times_count}")
 
     logging.debug(f'Populating the resulting JSON with url statistics')
     table: list = []
@@ -222,14 +219,14 @@ def main():
                       })
 
     # Statistics in the first row:
-    first_row = next(iter(table))
+    first_row: dict = next(iter(table))
     logging.debug(
         f"First row statistics: {first_row['url']}, count {first_row['count']}, count_perc {first_row['count_perc']}"
         f", time_avg {first_row['time_avg']}, time_max {first_row['time_max']}, time_med {first_row['time_med']}"
         f", time_perc {first_row['time_perc']}, time_sum {first_row['time_sum']}")
     logging.debug('Rendering report template')
     with open(report_template_file, 'rt') as f:
-        template = Template(f.read())
+        template: string.Template = Template(f.read())
     logging.debug('Writing the report')
     with open(report_file, 'w') as f:
         f.write(template.safe_substitute({'table_json': table}))
