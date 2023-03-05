@@ -140,7 +140,8 @@ def main():
     logging.basicConfig(format=log_format, filename=working_config['SCRIPT_LOG'],
                         level=getattr(logging, working_config['SCRIPT_LOG_LEVEL'], 'INFO'),
                         datefmt='%Y.%m.%d %H:%M:%S')
-
+    if working_config['SCRIPT_LOG']:
+        print(f"Writing log to {working_config['SCRIPT_LOG']}")
     def handle_exception(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
             logging.exception("Interrupted by user", exc_info=(exc_type, exc_value, exc_traceback))
