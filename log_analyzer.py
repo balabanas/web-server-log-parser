@@ -175,8 +175,8 @@ def main():
 
     logging.debug('Finding the proportion of the successfully parsed records. Exit if proportion is too small')
     records_processed = sum(map(len, url_times.values()))
-    # if '-' in url_times:
-    #     del url_times['-']
+    if '-' in url_times:
+        del url_times['-']
     records_parsed = sum(map(len, url_times.values()))
     records_parsed_share = round(records_parsed / records_processed, 3)
     logging.debug(f"The share of records parsed: {records_parsed_share}, threshold: {conf['ACCEPTABLE_PARSED_SHARE']}")
