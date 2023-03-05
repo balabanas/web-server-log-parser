@@ -182,8 +182,8 @@ def main():
     logging.debug(f"The share of records parsed: {records_parsed_share}, threshold: {conf['ACCEPTABLE_PARSED_SHARE']}")
     if records_parsed_share < conf['ACCEPTABLE_PARSED_SHARE']:
         logging.error(
-            f"Less then {conf['ACCEPTABLE_PARSED_SHARE']} of log records where successfully parsed. ({records_parsed_share}). "
-            f"Check if log format corresponds script expectations. Exiting...")
+            f"Less then {conf['ACCEPTABLE_PARSED_SHARE']} of log records where successfully parsed. "
+            f"({records_parsed_share}). Check if log format corresponds script expectations. Exiting...")
         sys.exit(0)
 
     logging.debug(f"Crop top {conf['REPORT_SIZE']} of urls with slowest total time")
@@ -211,7 +211,9 @@ def main():
     # Statistics in the first row:
     first_row = next(iter(table))
     logging.debug(
-        f"First row statistics: {first_row['url']}, count {first_row['count']}, count_perc {first_row['count_perc']}, time_avg {first_row['time_avg']}, time_max {first_row['time_max']}, time_med {first_row['time_med']}, time_perc {first_row['time_perc']}, time_sum {first_row['time_sum']}")
+        f"First row statistics: {first_row['url']}, count {first_row['count']}, count_perc {first_row['count_perc']}"
+        f", time_avg {first_row['time_avg']}, time_max {first_row['time_max']}, time_med {first_row['time_med']}"
+        f", time_perc {first_row['time_perc']}, time_sum {first_row['time_sum']}")
     logging.debug('Rendering report template')
     with open(report_template_file, 'rt') as f:
         template = Template(f.read())

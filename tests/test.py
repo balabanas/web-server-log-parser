@@ -1,14 +1,12 @@
 import argparse
 import configparser
 import os
-import time
 import unittest
 from datetime import datetime
 from unittest.mock import patch
 
 import log_analyzer
 from log_analyzer import get_latest_log, get_validated_path, get_config
-
 
 TMPDIR = os.path.join('tests', 'tmpdir')
 
@@ -74,7 +72,7 @@ class ValidatePathTest(unittest.TestCase):
 
     def test_raise_exception_invalid_path(self):
         with self.assertRaises(IOError):
-            path = get_validated_path(self.invalid_path, self.invalid_path_descr)
+            _ = get_validated_path(self.invalid_path, self.invalid_path_descr)
 
 
 class ReadConfigTest(unittest.TestCase):
@@ -91,7 +89,6 @@ class ReadConfigTest(unittest.TestCase):
             f.write('Corrupted config')
         with open(os.path.join(TMPDIR, 'temp_not_int_config.ini'), 'w') as f:
             f.write('[config]\nREPORT_SIZE = not an integer value')
-
 
     def tearDown(self):
         for tmpfile in os.listdir(TMPDIR):
@@ -111,17 +108,17 @@ class ReadConfigTest(unittest.TestCase):
     def test_get_nonexistent_config(self):
         self.args.config = os.path.join(TMPDIR, 'temp_nonexistent_config.ini')
         with self.assertRaises(Exception):
-            config = get_config(self.args, log_analyzer.config)
+            _ = get_config(self.args, log_analyzer.config)
 
     def test_get_corrupted_config(self):
         self.args.config = os.path.join(TMPDIR, 'temp_corrupted_config.ini')
         with self.assertRaises(configparser.MissingSectionHeaderError):
-            config = get_config(self.args, log_analyzer.config)
+            _ = get_config(self.args, log_analyzer.config)
 
     def test_get_not_int_config(self):
         self.args.config = os.path.join(TMPDIR, 'temp_not_int_config.ini')
         with self.assertRaises(ValueError):
-            config = get_config(self.args, log_analyzer.config)
+            _ = get_config(self.args, log_analyzer.config)
 
 
 class GeneratorURLTimeTest(unittest.TestCase):
@@ -154,7 +151,10 @@ class MainTest(unittest.TestCase):
         with self.assertLogs(level='DEBUG') as captured:
             log_analyzer.main()
         self.assertTrue(os.path.exists('tests/main_test/report-2023.02.28.html'))
-        self.assertIn('DEBUG:root:First row statistics: /url-with-largest-times, count 3, count_perc 0.136, time_avg 14.333, time_max 22.0, time_med 11.0, time_perc 0.867, time_sum 43.0', captured.output)
+        self.assertIn(
+            'DEBUG:root:First row statistics: /url-with-largest-times, count 3, count_perc 0.136, time_avg 14.333,'
+            'time_max 22.0, time_med 11.0, time_perc 0.867, time_sum 43.0',
+            captured.output)
 
     @patch('log_analyzer.sys.argv', ['log_analyzer.py', '--config', 'tests/main_test_empty_log_dir_config.ini'])
     def test_main_empty_log_dir(self):
