@@ -23,15 +23,19 @@ config: dict = {
 }
 
 
-def get_config(args: argparse.Namespace, current_config: dict) -> dict:
+def get_config(current_config: dict) -> dict:
     """
-    Takes CLI args. If --config option provided there, tries to read config file, parse parameters from it,
+    Defines parser for CLI args. If --config option provided there, tries to read config file, parse parameters from it,
     and alters the default `current_config` dict. Raises exceptions if file contains unreadable parameters or not
     exists.
-    :param args: CLI args dict
     :param current_config: current config dict
     :return: updated config dict
     """
+    # Check if --config provided, updating config
+    parser: argparse.ArgumentParser = argparse.ArgumentParser()
+    parser.add_argument('--config', default='', const='./config.ini', nargs='?', help='Path to a config file')
+    args: argparse.Namespace = parser.parse_args()
+
     current_config: dict = current_config.copy()  # avoiding updating global config
     current_config['SCRIPT_LOG'] = current_config.get('SCRIPT_LOG', None)
     current_config['SCRIPT_LOG_LEVEL'] = current_config.get('SCRIPT_LOG_LEVEL', 'INFO')
@@ -129,11 +133,7 @@ def get_validated_path(path_chunks: list, path_descr: str = None) -> str:
 
 
 def main():
-    # Check if --config provided, updating config
-    parser: argparse.ArgumentParser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='', const='./config.ini', nargs='?', help='Path to a config file')
-    args: argparse.Namespace = parser.parse_args()
-    working_config: dict = get_config(args, config)
+    working_config: dict = get_config(config)
 
     # Setting up logging
     log_format: str = '%(asctime)s %(levelname).1s %(message)s'
@@ -142,6 +142,7 @@ def main():
                         datefmt='%Y.%m.%d %H:%M:%S')
     if working_config['SCRIPT_LOG']:
         print(f"Writing log to {working_config['SCRIPT_LOG']}")
+
     def handle_exception(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
             logging.exception("Interrupted by user", exc_info=(exc_type, exc_value, exc_traceback))
