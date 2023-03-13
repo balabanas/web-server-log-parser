@@ -1,4 +1,3 @@
-import argparse
 import configparser
 import os
 import unittest
@@ -46,35 +45,33 @@ class GetValidatedPathTest(unittest.TestCase):
 
 class GetConfigTest(unittest.TestCase):
     @patch('log_analyzer.sys.argv', ['log_analyzer.py', '--config'])
-    def setUp(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--config', default='', const='./config.ini', nargs='?', help='Path to a config file')
-        self.args = parser.parse_args()
-
     def test_get_default_config(self):
-        config = get_config(self.args, log_analyzer.config)
+        config = get_config(log_analyzer.config)
         self.assertEqual(1001, config['REPORT_SIZE'])
 
+    @patch('log_analyzer.sys.argv', ['log_analyzer.py', '--config', os.path.join(TESTS_DIR, 'get_config', 'good_config.ini')])
     def test_get_good_config(self):
-        self.args.config = os.path.join(TESTS_DIR, 'get_config', 'good_config.ini')
-        config = get_config(self.args, log_analyzer.config)
+        config = get_config(log_analyzer.config)
         self.assertEqual('./test_log.txt', config['SCRIPT_LOG'])
         self.assertEqual(1000, config['REPORT_SIZE'])  # report size remained untouched
 
+    @patch('log_analyzer.sys.argv',
+           ['log_analyzer.py', '--config', os.path.join(TESTS_DIR, 'get_config', 'nonexistent_config.ini')])
     def test_get_nonexistent_config(self):
-        self.args.config = os.path.join(TESTS_DIR, 'get_config', 'nonexistent_config.ini')
         with self.assertRaises(Exception):
-            _ = get_config(self.args, log_analyzer.config)
-
+            _ = get_config(log_analyzer.config)
+    #
+    @patch('log_analyzer.sys.argv',
+           ['log_analyzer.py', '--config', os.path.join(TESTS_DIR, 'get_config', 'corrupted_config.ini')])
     def test_get_corrupted_config(self):
-        self.args.config = os.path.join(TESTS_DIR, 'get_config', 'corrupted_config.ini')
         with self.assertRaises(configparser.MissingSectionHeaderError):
-            _ = get_config(self.args, log_analyzer.config)
+            _ = get_config(log_analyzer.config)
 
+    @patch('log_analyzer.sys.argv',
+           ['log_analyzer.py', '--config', os.path.join(TESTS_DIR, 'get_config', 'not_int_config.ini')])
     def test_get_not_int_config(self):
-        self.args.config = os.path.join(TESTS_DIR, 'get_config', 'not_int_config.ini')
         with self.assertRaises(ValueError):
-            _ = get_config(self.args, log_analyzer.config)
+            _ = get_config(log_analyzer.config)
 
 
 class GetURLTimeFromRecordTest(unittest.TestCase):
