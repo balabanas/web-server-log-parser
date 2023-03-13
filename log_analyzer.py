@@ -64,6 +64,23 @@ def get_config(current_config: dict) -> dict:
     return current_config
 
 
+def set_logging(working_config: dict) -> None:
+    # Setting up logging
+    log_format: str = '%(asctime)s %(levelname).1s %(message)s'
+    logging.basicConfig(format=log_format, filename=working_config['SCRIPT_LOG'],
+                        level=getattr(logging, working_config['SCRIPT_LOG_LEVEL'], 'INFO'),
+                        datefmt='%Y.%m.%d %H:%M:%S')
+    if working_config['SCRIPT_LOG']:
+        print(f"Writing log to {working_config['SCRIPT_LOG']}")
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            logging.exception("Interrupted by user", exc_info=(exc_type, exc_value, exc_traceback))
+        logging.exception("Unknown exception, check trace", exc_info=(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = handle_exception
+
+
 def get_latest_log(path: str, pattern: str) -> Union[namedtuple, None]:
     """
     Get plain text or .gz log file with the latest date in it's name,
@@ -134,21 +151,7 @@ def get_validated_path(path_chunks: list, path_descr: str = None) -> str:
 
 def main():
     working_config: dict = get_config(config)
-
-    # Setting up logging
-    log_format: str = '%(asctime)s %(levelname).1s %(message)s'
-    logging.basicConfig(format=log_format, filename=working_config['SCRIPT_LOG'],
-                        level=getattr(logging, working_config['SCRIPT_LOG_LEVEL'], 'INFO'),
-                        datefmt='%Y.%m.%d %H:%M:%S')
-    if working_config['SCRIPT_LOG']:
-        print(f"Writing log to {working_config['SCRIPT_LOG']}")
-
-    def handle_exception(exc_type, exc_value, exc_traceback):
-        if issubclass(exc_type, KeyboardInterrupt):
-            logging.exception("Interrupted by user", exc_info=(exc_type, exc_value, exc_traceback))
-        logging.exception("Unknown exception, check trace", exc_info=(exc_type, exc_value, exc_traceback))
-
-    sys.excepthook = handle_exception
+    set_logging(working_config)
 
     logging.info('Log analyzer started')
     logging.debug(f'Default configuration: {config}')
